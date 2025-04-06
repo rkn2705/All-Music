@@ -1,0 +1,599 @@
+
+if (result != null) {  
+  setState(() {  
+    _audioFiles = result.paths.map((path) => File(path!)).toList();  
+  });  
+}
+
+}
+
+Future<void> _playFile(File file) async {
+try {
+await _player.setFilePath(file.path);
+_player.play();
+setState(() {
+_currentlyPlaying = file;
+});
+} catch (e) {
+print("Error playing file: $e");
+}
+}
+
+@override
+void dispose() {
+_player.dispose();
+super.dispose();
+}
+
+@override
+Widget build(BuildContext context) {
+return Column(
+children: [
+ElevatedButton.icon(
+onPressed: _pickFiles,
+icon: Icon(Icons.library_music),
+label: Text('Pick MP3 Files'),
+),
+Expanded(
+child: _audioFiles.isEmpty
+? Center(child: Text('No MP3 files selected'))
+: ListView.builder(
+itemCount: _audioFiles.length,
+itemBuilder: (context, index) {
+final file = _audioFiles[index];
+final isPlaying = file.path == _currentlyPlaying?.path;
+
+return ListTile(  
+                  leading: Icon(Icons.music_note),  
+                  title: Text(p.basename(file.path)),  
+                  trailing: IconButton(  
+                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),  
+                    onPressed: () => _playFile(file),  
+                  ),  
+                );  
+              },  
+            ),  
+    ),  
+  ],  
+);
+
+}
+}
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class SettingsPage extends StatefulWidget {
+final Function(bool) onThemeChanged;
+
+const SettingsPage({required this.onThemeChanged});
+
+@override
+_SettingsPageState createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+bool _isDarkMode = false;
+
+@override
+void initState() {
+super.initState();
+_loadTheme();
+}
+
+Future<void> _loadTheme() async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+_isDarkMode = prefs.getBool('darkMode') ?? false;
+});
+}
+
+Future<void> _toggleTheme(bool value) async {
+final prefs = await SharedPreferences.getInstance();
+await prefs.setBool('darkMode', value);
+widget.onThemeChanged(value);
+setState(() {
+_isDarkMode = value;
+});
+}
+
+Future<void> _clearFavorites() async {
+final prefs = await SharedPreferences.getInstance();
+await prefs.remove('favorites');
+ScaffoldMessenger.of(context).showSnackBar(
+SnackBar(content: Text('Favorites cleared!')),
+);
+}
+
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+appBar: AppBar(
+title: Text('Settings'),
+),
+body: ListView(
+children: [
+SwitchListTile(
+title: Text('Dark Mode'),
+value: _isDarkMode,
+onChanged: _toggleTheme,
+),
+ListTile(
+title: Text('Clear All Favorites'),
+trailing: Icon(Icons.delete),
+onTap: _clearFavorites,
+),
+],
+),
+);
+}
+}
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/home_page.dart';
+
+void main() async {
+WidgetsFlutterBinding.ensureInitialized();
+final prefs = await SharedPreferences.getInstance();
+final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+
+runApp(MyApp(isDarkMode: isDarkMode));
+}
+
+class MyApp extends StatefulWidget {
+final bool isDarkMode;
+MyApp({required this.isDarkMode});
+
+@override
+State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+late bool _isDark;
+
+@override
+void initState() {
+super.initState();
+_isDark = widget.isDarkMode;
+}
+
+void _toggleTheme(bool value) async {
+final prefs = await SharedPreferences.getInstance();
+await prefs.setBool('isDarkMode', value);
+setState(() {
+_isDark = value;
+});
+}
+
+@override
+Widget build(BuildContext context) {
+return MaterialApp(
+title: 'All-In-One Music App',
+theme: _isDark ? ThemeData.dark() : ThemeData.light(),
+home: HomePage(onToggleTheme: _toggleTheme),
+debugShowCheckedModeBanner: false,
+);
+}
+}
+import 'package:flutter/material.dart';
+import 'favorites_tab.dart';
+import 'video_tab.dart';
+import 'mp3_tab.dart';
+import 'settings_page.dart';
+
+class HomePage extends StatefulWidget {
+final Function(bool) onToggleTheme;
+const HomePage({required this.onToggleTheme});
+
+@override
+_HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+int _selectedIndex = 0;
+
+final List<Widget> _pages = [
+VideoTab(),
+Mp3Tab(),
+FavoritesTab(),
+];
+
+void _onItemTapped(int index) {
+setState(() {
+_selectedIndex = index;
+});
+}
+
+void _openSettings() {
+Navigator.push(
+context,
+MaterialPageRoute(
+builder: (context) => SettingsPage(onThemeChanged: widget.onToggleTheme),
+),
+);
+}
+
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+appBar: AppBar(
+title: Text('All-In-One Music App'),
+actions: [
+IconButton(
+icon: Icon(Icons.settings),
+onPressed: _openSettings,
+),
+],
+),
+body: _pages[_selectedIndex],
+bottomNavigationBar: BottomNavigationBar(
+currentIndex: _selectedIndex,
+selectedItemColor: Theme.of(context).colorScheme.primary,
+onTap: _onItemTapped,
+items: [
+BottomNavigationBarItem(
+icon: Icon(Icons.video_library),
+label: 'Videos',
+),
+BottomNavigationBarItem(
+icon: Icon(Icons.music_note),
+label: 'MP3',
+),
+BottomNavigationBarItem(
+icon: Icon(Icons.favorite),
+label: 'Favorites',
+),
+],
+),
+);
+}
+}
+import 'package:flutter/material.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class VideoTab extends StatefulWidget {
+@override
+_VideoTabState createState() => _VideoTabState();
+}
+
+class _VideoTabState extends State<VideoTab> {
+final List<Map<String, String>> _videos = [
+{'title': 'Peaceful Bhajan', 'url': 'https://www.youtube.com/watch?v=AjH4R07YvSA', 'category': 'Bhajan'},
+{'title': 'Relaxing Music', 'url': 'https://www.youtube.com/watch?v=2OEL4P1Rz04', 'category': 'Relax'},
+{'title': 'Motivation Song', 'url': 'https://www.youtube.com/watch?v=mgmVOuLgFB0', 'category': 'Motivation'},
+];
+
+List<Map<String, String>> _filteredVideos = [];
+String _selectedCategory = 'All';
+String _searchQuery = '';
+List<String> _favorites = [];
+
+@override
+void initState() {
+super.initState();
+_filteredVideos = _videos;
+_loadFavorites();
+}
+
+void _filterVideos() {
+setState(() {
+_filteredVideos = _videos.where((video) {
+final matchesCategory = _selectedCategory == 'All' || video['category'] == _selectedCategory;
+final matchesSearch = video['title']!.toLowerCase().contains(_searchQuery.toLowerCase());
+return matchesCategory && matchesSearch;
+}).toList();
+});
+}
+
+Future<void> _loadFavorites() async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+_favorites = prefs.getStringList('favorites') ?? [];
+});
+}
+
+Future<void> _toggleFavorite(String url) async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+if (_favorites.contains(url)) {
+_favorites.remove(url);
+} else {
+_favorites.add(url);
+}
+prefs.setStringList('favorites', _favorites);
+});
+}
+
+@override
+Widget build(BuildContext context) {
+final categories = ['All', 'Bhajan', 'Relax', 'Motivation'];
+
+return Column(  
+  children: [  
+    Padding(  
+      padding: const EdgeInsets.all(8.0),  
+      child: Row(  
+        children: [  
+          DropdownButton<String>(  
+            value: _selectedCategory,  
+            items: categories.map((String value) {  
+              return DropdownMenuItem<String>(  
+                value: value,  
+                child: Text(value),  
+              );  
+            }).toList(),  
+            onChanged: (val) {  
+              _selectedCategory = val!;  
+              _filterVideos();  
+            },  
+          ),  
+          SizedBox(width: 10),  
+          Expanded(  
+            child: TextField(  
+              decoration: InputDecoration(hintText: 'Search...'),  
+              onChanged: (text) {  
+                _searchQuery = text;  
+                _filterVideos();  
+              },  
+            ),  
+          ),  
+        ],  
+      ),  
+    ),  
+    Expanded(  
+      child: ListView.builder(  
+        itemCount: _filteredVideos.length,  
+        itemBuilder: (context, index) {  
+          final video = _filteredVideos[index];  
+          final videoId = YoutubePlayer.convertUrlToId(video['url']!);  
+          final isFav = _favorites.contains(video['url']);  
+          return Card(  
+            margin: EdgeInsets.all(8),  
+            child: Column(  
+              children: [  
+                YoutubePlayer(  
+                  controller: YoutubePlayerController(  
+                    initialVideoId: videoId!,  
+                    flags: YoutubePlayerFlags(autoPlay: false),  
+                  ),  
+                  showVideoProgressIndicator: true,  
+                ),  
+                ListTile(  
+                  title: Text(video['title']!),  
+                  trailing: IconButton(  
+                    icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),  
+                    onPressed: () => _toggleFavorite(video['url']!),  
+                  ),  
+                )  
+              ],  
+            ),  
+          );  
+        },  
+      ),  
+    ),  
+  ],  
+);
+
+}
+}
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+
+class FavoritesTab extends StatefulWidget {
+@override
+_FavoritesTabState createState() => _FavoritesTabState();
+}
+
+class _FavoritesTabState extends State<FavoritesTab> {
+List<String> _favorites = [];
+
+@override
+void initState() {
+super.initState();
+_loadFavorites();
+}
+
+Future<void> _loadFavorites() async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+_favorites = prefs.getStringList('favorites') ?? [];
+});
+}
+
+Future<void> _removeFavorite(String url) async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+_favorites.remove(url);
+prefs.setStringList('favorites', _favorites);
+});
+}
+
+@override
+Widget build(BuildContext context) {
+return _favorites.isEmpty
+? Center(child: Text('No favorites added yet.'))
+: ListView.builder(
+itemCount: _favorites.length,
+itemBuilder: (context, index) {
+final url = _favorites[index];
+final videoId = YoutubePlayer.convertUrlToId(url);
+
+return Card(  
+            margin: EdgeInsets.all(8),  
+            child: Column(  
+              children: [  
+                YoutubePlayer(  
+                  controller: YoutubePlayerController(  
+                    initialVideoId: videoId!,  
+                    flags: YoutubePlayerFlags(autoPlay: false),  
+                  ),  
+                  showVideoProgressIndicator: true,  
+                ),  
+                ListTile(  
+                  title: Text('Favorite Video ${index + 1}'),  
+                  trailing: IconButton(  
+                    icon: Icon(Icons.delete),  
+                    onPressed: () => _removeFavorite(url),  
+                  ),  
+                ),  
+              ],  
+            ),  
+          );  
+        },  
+      );
+
+}
+}
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'dart:io';
+import 'package:path/path.dart' as p;
+
+class Mp3Tab extends StatefulWidget {
+@override
+_Mp3TabState createState() => _Mp3TabState();
+}
+
+class _Mp3TabState extends State<Mp3Tab> {
+List<File> _audioFiles = [];
+AudioPlayer _player = AudioPlayer();
+File? _currentlyPlaying;
+
+Future<void> _pickFiles() async {
+FilePickerResult? result = await FilePicker.platform.pickFiles(
+type: FileType.custom,
+allowedExtensions: ['mp3'],
+allowMultiple: true,
+);
+
+if (result != null) {  
+  setState(() {  
+    _audioFiles = result.paths.map((path) => File(path!)).toList();  
+  });  
+}
+
+}
+
+Future<void> _playFile(File file) async {
+try {
+await _player.setFilePath(file.path);
+_player.play();
+setState(() {
+_currentlyPlaying = file;
+});
+} catch (e) {
+print("Error playing file: $e");
+}
+}
+
+@override
+void dispose() {
+_player.dispose();
+super.dispose();
+}
+
+@override
+Widget build(BuildContext context) {
+return Column(
+children: [
+ElevatedButton.icon(
+onPressed: _pickFiles,
+icon: Icon(Icons.library_music),
+label: Text('Pick MP3 Files'),
+),
+Expanded(
+child: _audioFiles.isEmpty
+? Center(child: Text('No MP3 files selected'))
+: ListView.builder(
+itemCount: _audioFiles.length,
+itemBuilder: (context, index) {
+final file = _audioFiles[index];
+final isPlaying = file.path == _currentlyPlaying?.path;
+
+return ListTile(  
+                  leading: Icon(Icons.music_note),  
+                  title: Text(p.basename(file.path)),  
+                  trailing: IconButton(  
+                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),  
+                    onPressed: () => _playFile(file),  
+                  ),  
+                );  
+              },  
+            ),  
+    ),  
+  ],  
+);
+
+}
+}
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class SettingsPage extends StatefulWidget {
+final Function(bool) onThemeChanged;
+
+const SettingsPage({required this.onThemeChanged});
+
+@override
+_SettingsPageState createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+bool _isDarkMode = false;
+
+@override
+void initState() {
+super.initState();
+_loadTheme();
+}
+
+Future<void> _loadTheme() async {
+final prefs = await SharedPreferences.getInstance();
+setState(() {
+_isDarkMode = prefs.getBool('darkMode') ?? false;
+});
+}
+
+Future<void> _toggleTheme(bool value) async {
+final prefs = await SharedPreferences.getInstance();
+await prefs.setBool('darkMode', value);
+widget.onThemeChanged(value);
+setState(() {
+_isDarkMode = value;
+});
+}
+
+Future<void> _clearFavorites() async {
+final prefs = await SharedPreferences.getInstance();
+await prefs.remove('favorites');
+ScaffoldMessenger.of(context).showSnackBar(
+SnackBar(content: Text('Favorites cleared!')),
+);
+}
+
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+appBar: AppBar(
+title: Text('Settings'),
+),
+body: ListView(
+children: [
+SwitchListTile(
+title: Text('Dark Mode'),
+value: _isDarkMode,
+onChanged: _toggleTheme,
+),
+ListTile(
+title: Text('Clear All Favorites'),
+trailing: Icon(Icons.delete),
+onTap: _clearFavorites,
+),
+],
+),
+);
+}
+}
+
