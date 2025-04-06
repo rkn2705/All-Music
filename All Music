@@ -1,132 +1,3 @@
-
-if (result != null) {  
-  setState(() {  
-    _audioFiles = result.paths.map((path) => File(path!)).toList();  
-  });  
-}
-
-}
-
-Future<void> _playFile(File file) async {
-try {
-await _player.setFilePath(file.path);
-_player.play();
-setState(() {
-_currentlyPlaying = file;
-});
-} catch (e) {
-print("Error playing file: $e");
-}
-}
-
-@override
-void dispose() {
-_player.dispose();
-super.dispose();
-}
-
-@override
-Widget build(BuildContext context) {
-return Column(
-children: [
-ElevatedButton.icon(
-onPressed: _pickFiles,
-icon: Icon(Icons.library_music),
-label: Text('Pick MP3 Files'),
-),
-Expanded(
-child: _audioFiles.isEmpty
-? Center(child: Text('No MP3 files selected'))
-: ListView.builder(
-itemCount: _audioFiles.length,
-itemBuilder: (context, index) {
-final file = _audioFiles[index];
-final isPlaying = file.path == _currentlyPlaying?.path;
-
-return ListTile(  
-                  leading: Icon(Icons.music_note),  
-                  title: Text(p.basename(file.path)),  
-                  trailing: IconButton(  
-                    icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),  
-                    onPressed: () => _playFile(file),  
-                  ),  
-                );  
-              },  
-            ),  
-    ),  
-  ],  
-);
-
-}
-}
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-class SettingsPage extends StatefulWidget {
-final Function(bool) onThemeChanged;
-
-const SettingsPage({required this.onThemeChanged});
-
-@override
-_SettingsPageState createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
-bool _isDarkMode = false;
-
-@override
-void initState() {
-super.initState();
-_loadTheme();
-}
-
-Future<void> _loadTheme() async {
-final prefs = await SharedPreferences.getInstance();
-setState(() {
-_isDarkMode = prefs.getBool('darkMode') ?? false;
-});
-}
-
-Future<void> _toggleTheme(bool value) async {
-final prefs = await SharedPreferences.getInstance();
-await prefs.setBool('darkMode', value);
-widget.onThemeChanged(value);
-setState(() {
-_isDarkMode = value;
-});
-}
-
-Future<void> _clearFavorites() async {
-final prefs = await SharedPreferences.getInstance();
-await prefs.remove('favorites');
-ScaffoldMessenger.of(context).showSnackBar(
-SnackBar(content: Text('Favorites cleared!')),
-);
-}
-
-@override
-Widget build(BuildContext context) {
-return Scaffold(
-appBar: AppBar(
-title: Text('Settings'),
-),
-body: ListView(
-children: [
-SwitchListTile(
-title: Text('Dark Mode'),
-value: _isDarkMode,
-onChanged: _toggleTheme,
-),
-ListTile(
-title: Text('Clear All Favorites'),
-trailing: Icon(Icons.delete),
-onTap: _clearFavorites,
-),
-],
-),
-);
-}
-}
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_page.dart';
@@ -596,4 +467,26 @@ onTap: _clearFavorites,
 );
 }
 }
+name: all_in_one_music
+description: A simple music app with YouTube, MP3, favorites and dark mode toggle.
 
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+  youtube_player_flutter: ^8.1.0
+  file_picker: ^6.1.1
+  just_audio: ^0.9.34
+  path: ^1.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
